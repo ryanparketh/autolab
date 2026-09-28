@@ -1,0 +1,247 @@
+// Auto Lab — database schema.
+// All timestamps are stored in UTC. Shop-local interpretation uses SHOP_TIMEZONE.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ServiceCategory {
+  DETAILING
+  WINDOW_TINT
+  PPF
+  CERAMIC_COATING
+}
+
+enum VehicleSize {
+  COUPE_SEDAN
+  SMALL_SUV
+  LARGE_SUV_TRUCK
+  EXOTIC
+}
+
+enum BookingMode {
+  INSTANT // bookable online with a fixed price per vehicle size
+  QUOTE // "starting at" price; customer requests a quote
+}
+
+enum DepositType {
+  FLAT // depositValue is in cents
+  PERCENT // depositValue is a whole-number percent of the price
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT // slot is held until holdExpiresAt while the customer pays the deposit
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  EXPIRED // deposit never paid; slot released
+}
+
+enum BookingSource {
+  ONLINE
+  QUOTE
+  ADMIN
+}
+
+enum QuoteStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  CLOSED
+}
+
+// Singleton row (id = 1) holding shop-wide scheduling settings.
+model Settings {
+  id                Int @id @default(1)
+  bayCount          Int @default(2)
+  slotIntervalMin   Int @default(30)
+  minLeadHours      Int @default(12) // earliest a customer can book from now
+  bookingWindowDays Int @default(60) // how far ahead customers can book
+}
+
+// One row per ISO weekday (1 = Monday ... 7 = Sunday). Minutes are from local midnight.
+model BusinessHours {
+  weekday     Int     @id
+  isOpen      Boolean @default(true)
+  openMinute  Int     @default(480) // 8:00
+  closeMinute Int     @default(1080) // 18:00
+}
+
+// Specific dates the shop is closed (holidays, vacations). Local date "YYYY-MM-DD".
+model ClosedDate {
+  date   String  @id
+  reason String?
+}
+
+model Service {
+  id              String          @id @default(cuid())
+  slug            String          @unique
+  category        ServiceCategory
+  name            String
+  tagline         String
+  description     String
+  features        String[]
+  bookingMode     BookingMode     @default(INSTANT)
+  // Multi-day jobs (PPF, ceramic incl. cure time) block a bay for whole business days.
+  // When null, the job is same-day and durations come from ServicePrice.durationMinutes.
+  durationDays    Int?
+  startingAtCents Int? // shown for QUOTE services
+  depositType     DepositType     @default(FLAT)
+  depositValue    Int             @default(5000)
+  popular         Boolean         @default(false)
+  active          Boolean         @default(true)
+  sortOrder       Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  prices   ServicePrice[]
+  bookings Booking[]
+  quotes   QuoteRequest[]
+}
+
+model ServicePrice {
+  id              String      @id @default(cuid())
+  serviceId       String
+  vehicleSize     VehicleSize
+  priceCents      Int
+  durationMinutes Int // ignored for multi-day services
+
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceId, vehicleSize])
+}
+
+model AddOn {
+  id              String            @id @default(cuid())
+  name            String
+  description     String
+  priceCents      Int
+  durationMinutes Int               @default(0)
+  categories      ServiceCategory[]
+  active          Boolean           @default(true)
+  sortOrder       Int               @default(0)
+
+  bookings BookingAddOn[]
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  email     String   @unique // stored lowercase
+  name      String
+  phone     String
+  smsOptIn  Boolean  @default(false)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehicles Vehicle[]
+  bookings Booking[]
+  quotes   QuoteRequest[]
+}
+
+model Vehicle {
+  id         String      @id @default(cuid())
+  customerId String
+  year       Int
+  make       String
+  model      String
+  color      String?
+  size       VehicleSize
+  createdAt  DateTime    @default(now())
+
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([customerId])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  reference   String        @unique // human-friendly code, e.g. AL-7K3P9Q
+  status      BookingStatus @default(PENDING_PAYMENT)
+  source      BookingSource @default(ONLINE)
+  customerId  String
+  vehicleId   String
+  serviceId   String
+  serviceName String // snapshot so renaming a service doesn't rewrite history
+  vehicleSize VehicleSize
+  startAt     DateTime
+  endAt       DateTime
+
+  priceCents   Int // estimated total (service + add-ons)
+  depositCents Int
+
+  holdExpiresAt           DateTime?
+  stripeCheckoutSessionId String?   @unique
+  stripePaymentIntentId   String?
+  depositPaidAt           DateTime?
+  depositRefundedAt       DateTime?
+
+  customerNotes String?
+  adminNotes    String?
+
+  reminderSentAt DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  customer Customer       @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  vehicle  Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  service  Service        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  addOns   BookingAddOn[]
+  quote    QuoteRequest?
+
+  @@index([startAt])
+  @@index([status, startAt])
+  @@index([customerId])
+}
+
+model BookingAddOn {
+  bookingId  String
+  addOnId    String
+  name       String // snapshot
+  priceCents Int // snapshot
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  addOn   AddOn   @relation(fields: [addOnId], references: [id], onDelete: Restrict)
+
+  @@id([bookingId, addOnId])
+}
+
+model QuoteRequest {
+  id           String          @id @default(cuid())
+  status       QuoteStatus     @default(NEW)
+  customerId   String
+  serviceId    String?
+  category     ServiceCategory
+  vehicleYear  Int
+  vehicleMake  String
+  vehicleModel String
+  vehicleSize  VehicleSize
+  message      String?
+  bookingId    String?         @unique
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  service  Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  booking  Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+}
+
+// Failed admin login attempts, used for brute-force throttling.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  ip        String
+  createdAt DateTime @default(now())
+
+  @@index([ip, createdAt])
+}

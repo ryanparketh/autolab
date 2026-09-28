@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* ── Brand tokens (PLACEHOLDER palette — swap once brand colors are final) ── */
+@theme {
+  --color-bg: #0a0b0d;
+  --color-surface: #121418;
+  --color-surface-2: #181b21;
+  --color-line: #252a32;
+  --color-line-strong: #343a44;
+  --color-ink: #eef0f3;
+  --color-muted: #9aa1ac;
+  --color-subtle: #6b727d;
+  --color-accent: #4f8cff;
+  --color-accent-strong: #2f6fec;
+  --color-accent-ink: #ffffff;
+  --color-ok: #34c77b;
+  --color-warn: #f2b33d;
+  --color-danger: #ef5350;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6;
+  }
+  .eyebrow {
+    @apply font-mono text-xs tracking-[0.2em] text-accent uppercase;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-accent text-accent-ink hover:bg-accent-strong;
+  }
+  .btn-ghost {
+    @apply border border-line-strong text-ink hover:border-muted hover:bg-surface-2;
+  }
+  .btn-danger {
+    @apply border border-danger/50 text-danger hover:bg-danger/10;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+  .input {
+    @apply w-full rounded-lg border border-line-strong bg-bg px-3 py-2.5 text-sm text-ink placeholder:text-subtle focus:border-accent focus:outline-none;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink;
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--color-line) 55%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--color-line) 55%, transparent) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+}
