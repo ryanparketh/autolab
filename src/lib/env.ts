@@ -1,4 +1,5 @@
 import "server-only";
+import { siteUrl } from "./site-url";
 
 // Centralised, validated access to server environment variables.
 // Optional integrations (Stripe, Resend, Twilio) degrade gracefully in
@@ -22,7 +23,7 @@ export const env = {
     return process.env.SHOP_TIMEZONE || "America/Los_Angeles";
   },
   get siteUrl() {
-    return (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+    return siteUrl();
   },
   get sessionSecret() {
     const s = required("SESSION_SECRET");

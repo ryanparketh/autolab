@@ -52,19 +52,14 @@ Checks: `npm test` (scheduling and pricing engine), `npm run typecheck`, `npm ru
 
 Refunds are issued from the booking page in admin.
 
-## Deploying (Vercel + Neon or any Postgres)
+## Deploying (Vercel + Neon)
 
-1. Create a Postgres database and set every variable from `.env.example` in Vercel.
-2. Set the build command to `npx prisma migrate deploy && npm run build`, then deploy. After the first deploy, run `npm run db:seed` once against production, or add services in admin.
-3. In Stripe, add a webhook to `https://<domain>/api/stripe/webhook` with these events:
-   - `checkout.session.completed`
-   - `checkout.session.async_payment_succeeded`
-   - `checkout.session.expired`
-
-   Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
-4. In Resend, verify the sending domain for `EMAIL_FROM`.
-5. For Twilio, US numbers need **A2P 10DLC registration** before messages are delivered. Budget 1–3 weeks for it.
-6. Cron: `vercel.json` runs reminders daily at 16:00 UTC, which is the most often Vercel Hobby allows. On Vercel Pro, change it to hourly (`0 * * * *`) for evenly timed 24-hour reminders.
+1. Import the GitHub repo in Vercel (framework: Next.js; leave the build command on its default — it picks up `npm run vercel-build`, which runs migrations, seeds missing placeholder data, then builds. Re-running it never overwrites admin edits).
+2. In the Vercel project → Storage, add a **Neon** Postgres database. It sets `DATABASE_URL` (pooled, used at runtime) and `DATABASE_URL_UNPOOLED` (direct, used for migrations) automatically.
+3. Set the remaining variables from `.env.example` (at minimum `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH_B64`, `SESSION_SECRET`, `CRON_SECRET`, `SHOP_TIMEZONE`, and Stripe keys), then redeploy. `NEXT_PUBLIC_SITE_URL` is optional until you add a custom domain.
+4. Stripe → Developers → Webhooks → add endpoint `https://<domain>/api/stripe/webhook` with events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.expired`; put its signing secret in `STRIPE_WEBHOOK_SECRET`. Use test-mode keys (`sk_test_…`, card 4242 4242 4242 4242) until you're ready for real money.
+5. Resend: verify the sending domain for `EMAIL_FROM`. Twilio: US numbers need **A2P 10DLC registration** before messages deliver — budget 1–3 weeks.
+6. Cron: `vercel.json` runs reminders daily at 16:00 UTC (Vercel Hobby's max frequency). On Pro, change to hourly (`0 * * * *`).
 
 ## Before launch — placeholders to replace
 

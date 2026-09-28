@@ -1,8 +1,9 @@
+import { siteUrl } from "@/lib/site-url";
 import type { MetadataRoute } from "next";
 import { categoryMeta } from "@/config/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  const base = siteUrl();
   const paths = ["", "/services", "/book", "/quote", "/contact", "/policies"].concat(
     Object.values(categoryMeta).map((c) => `/services/${c.slug}`),
   );

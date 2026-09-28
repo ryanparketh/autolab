@@ -1,3 +1,4 @@
+import { siteUrl } from "@/lib/site-url";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { site } from "@/config/site";
@@ -9,7 +10,7 @@ const jsonLd = {
   description: site.description,
   telephone: site.phone,
   email: site.email,
-  url: process.env.NEXT_PUBLIC_SITE_URL,
+  url: siteUrl(),
   address: {
     "@type": "PostalAddress",
     streetAddress: site.address.street,
